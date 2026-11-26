@@ -7,7 +7,12 @@ import pathlib
 import re
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-ORDER = ['vendor/chess.js', 'js/coach.js', 'js/engine.js', 'js/bots.js', 'js/board.js', 'js/app.js']
+ORDER = [
+    'vendor/chess.js', 'js/coach.js', 'js/engine.js', 'js/bots.js', 'js/board.js',
+    'js/store.js', 'js/prefs.js', 'js/ui/dom.js', 'js/chesscom.js', 'js/review.js', 'js/reviewer.js',
+    'js/ui/tabs.js', 'js/app.js', 'js/ui/games.js', 'js/ui/review.js', 'js/ui/progress.js', 'js/ui/settings.js',
+    'js/main.js',
+]
 
 IMPORT_RE = re.compile(r"^\s*import\s*\{[^}]*\}\s*from\s*'[^']+';\s*$", re.M | re.S)
 EXPORT_RE = re.compile(r'^export\s+(?:async\s+)?(?:function|class|const|let)\s+(\w+)', re.M)
@@ -39,11 +44,30 @@ def main():
         assert tag in html, tag
         html = html.replace(tag, f'<style>\n{read(href)}</style>')
 
+    # PWA-ссылки по file:// не работают — убираем, иконку вклеиваем data-URI
+    import base64
+    html = re.sub(r'\s*<link rel="manifest"[^>]*>', '', html)
+    html = re.sub(r'\s*<link rel="apple-touch-icon"[^>]*>', '', html)
+    icon = base64.b64encode((ROOT / 'icons' / 'icon-192.png').read_bytes()).decode()
+    html = html.replace('href="icons/icon-192.png"', f'href="data:image/png;base64,{icon}"')
+
+    names = {}
+    for rel in ORDER:
+        for n in EXPORT_RE.findall(read(rel)):
+            if rel.startswith('vendor') and n != 'Chess':
+                continue
+            if n in names:
+                raise SystemExit(f'имя {n} экспортируют и {names[n]}, и {rel}')
+            names[n] = rel
+    missing = sorted(set(str(p.relative_to(ROOT)).replace('\\', '/') for p in (ROOT / 'js').rglob('*.js')) - set(ORDER))
+    if missing:
+        raise SystemExit(f'модули не в ORDER: {missing}')
+
     js = ''.join(module(rel, only={'Chess'} if rel.startswith('vendor') else None) for rel in ORDER)
     sf = read('vendor/stockfish.js')
     for bad in ('</script', '<!--'):
         assert bad not in js and bad not in sf, bad
-    tag = '<script type="module" src="js/app.js"></script>'
+    tag = '<script type="module" src="js/main.js"></script>'
     assert tag in html
     html = html.replace(
         tag,

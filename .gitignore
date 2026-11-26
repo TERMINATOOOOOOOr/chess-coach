@@ -8,3 +8,7 @@ CLAUDE.md
 tests/screens/
 __pycache__/
 node_modules/
+
+# сборки
+www/
+android/app/build/

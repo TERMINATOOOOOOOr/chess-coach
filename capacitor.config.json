@@ -1,0 +1,9 @@
+{
+  "appId": "io.github.terminatooooooor.shoh",
+  "appName": "Shoh",
+  "webDir": "www",
+  "backgroundColor": "#0e0f12",
+  "android": {
+    "backgroundColor": "#0e0f12"
+  }
+}

@@ -213,7 +213,124 @@ async def run(url, check):
         await m.screenshot(path=str(SHOTS / 'mobile-game.png'), full_page=True)
 
         check(not errors, 'консоль без ошибок' + ('' if not errors else f': {errors[:3]}'))
+        await run_phone_app(browser, url, check)
         await browser.close()
+
+
+async def run_phone_app(browser, url, check):
+    """Телефонное приложение: chess.com (подменён фикстурой), разбор, «доиграть», «поделиться», офлайн."""
+    import json
+    print('— приложение для телефона —')
+    fixture = json.loads((ROOT / 'tests' / 'fixtures' / 'chesscom.json').read_text(encoding='utf-8'))
+    ctx = await browser.new_context(viewport={'width': 412, 'height': 915}, device_scale_factor=2, is_mobile=True, has_touch=True)
+    api_calls = []
+
+    async def api(route):
+        u = route.request.url
+        api_calls.append(u)
+        for month, data in fixture.items():
+            if u.endswith('testplayer/games/' + month):
+                return await route.fulfill(json=data, headers={'Access-Control-Allow-Origin': '*'})
+        await route.fulfill(status=404, json={}, headers={'Access-Control-Allow-Origin': '*'})
+
+    await ctx.route('https://api.chess.com/**', api)
+    page = await ctx.new_page()
+    errors = []
+    page.on('pageerror', lambda e: errors.append(str(e)))
+    page.on('console', lambda m: m.type == 'error' and errors.append(m.text))
+    await page.goto(url + '#games')
+    await page.wait_for_selector('#connect:not([hidden])')
+    await page.screenshot(path=str(SHOTS / 'phone-connect.png'))
+
+    # 1. ник → партии подтянулись, шахматы-960 отфильтрованы
+    await page.fill('#connect-name', 'TestPlayer')
+    await page.click('#connect button[type=submit]')
+    await page.wait_for_selector('.gcard', timeout=15000)
+    await page.wait_for_timeout(300)
+    ids = await page.eval_on_selector_all('.gcard', 'els => els.map(e => e.dataset.id)')
+    check(ids == ['cc-live-100000002', 'cc-live-100000001', 'cc-daily-200000004'], f'партии с chess.com: {ids}')
+    await page.screenshot(path=str(SHOTS / 'phone-games.png'))
+
+    # 2. открыть партию → разбор доходит до конца
+    await page.click('.gcard[data-id="cc-live-100000001"]')
+    await page.wait_for_function('!document.getElementById("review-summary").hidden', timeout=90000)
+    acc = await page.text_content('#review-summary')
+    check('Вы' in acc and '%' in acc, f'сводка разбора: {" ".join(acc.split())}')
+    check(await page.locator('#review-graph circle').count() >= 1, 'на графике отмечен зевок')
+    await page.click('.moment')
+    tag = await page.text_content('#rv-tag')
+    text = await page.text_content('#rv-text')
+    check('Зевок' in tag and 'мат' in text, f'ключевой момент: {tag.strip()} — {text}')
+    check(await page.locator('#review-board .arrow.best').count() == 1, 'стрелка «лучше было» на доске')
+    await page.screenshot(path=str(SHOTS / 'phone-review.png'), full_page=True)
+    pos = await page.text_content('#rv-pos')
+    await page.click('#rv-prev')
+    check(await page.text_content('#rv-pos') != pos, f'листание ходов: {pos} → {await page.text_content("#rv-pos")}')
+
+    # 3. «Доиграть отсюда» — позиция до зевка, играю за свой цвет
+    fen_before = await page.evaluate('''(async () => {
+        const r = await new Promise(res => { const req = indexedDB.open('shoh'); req.onsuccess = () => res(req.result); });
+        const g = await new Promise(res => { const q = r.transaction('games').objectStore('games').get('cc-live-100000001'); q.onsuccess = () => res(q.result); });
+        return g.review.plies[4].fenAfter;
+    })()''')
+    await page.click('#rv-play')
+    await page.wait_for_selector('#setup[open]')
+    eyebrow = await page.text_content('#setup-eyebrow')
+    await page.click('#setup button[value=start]')
+    await wait_js(page, 'window.__shoh.state.started && window.__shoh.state.analysis !== null', 30000)
+    st = await page.evaluate('({fen: window.__shoh.state.game.fen(), player: window.__shoh.state.player})')
+    check('Доиграть' in eyebrow and st['fen'] == fen_before and st['player'] == 'b', f'доиграть отсюда: {eyebrow}, ход {st["player"]}')
+    await page.screenshot(path=str(SHOTS / 'phone-play.png'))
+
+    # 4. «Прогресс»
+    await page.click('.tabbar [data-tab=progress]')
+    await page.wait_for_selector('.hero')
+    hero = await page.text_content('.hero')
+    check('%' in hero and await page.locator('.tip').count() == 1, f'прогресс: {" ".join(hero.split())[:60]}')
+    await page.screenshot(path=str(SHOTS / 'phone-progress.png'), full_page=True)
+
+    # 5. «Поделиться» из chess.com: приложение открывается с ?text=<ссылка>
+    await page.goto(url + '?text=' + 'Моя%20партия%20https%3A%2F%2Fwww.chess.com%2Fgame%2Flive%2F100000002')
+    await wait_js(page, 'location.hash === "#review/cc-live-100000002"', 15000)
+    title = await page.text_content('#review-title')
+    check('OpponentTwo' in title, f'«Поделиться» открыло разбор: {title}')
+    await page.wait_for_function('!document.getElementById("review-summary").hidden', timeout=90000)
+
+    # 6. PGN через «Добавить»
+    await page.goto(url + '#games')
+    await page.click('#btn-add-game')
+    pgn = '[White "TestPlayer"]\n[Black "Friend"]\n[Result "0-1"]\n\n1. f3 e5 2. g4 Qh4# 0-1'
+    await page.fill('#add-text', pgn)
+    await page.click('#add-submit')
+    await wait_js(page, 'location.hash.startsWith("#review/pgn-")', 10000)
+    check(True, 'PGN добавлен и открыт на разбор')
+    await page.fill('#add-text', '') if False else None
+    await page.goto(url + '#games')
+    await page.click('#btn-add-game')
+    await page.fill('#add-text', 'просто текст')
+    await page.click('#add-submit')
+    err = await page.text_content('#add-error')
+    check('ни ссылки' in err, f'понятная ошибка на мусор: {err}')
+    await page.keyboard.press('Escape')
+
+    # 7. офлайн: service worker отдаёт приложение и движок без сети
+    if url.startswith('http'):
+        await page.evaluate('navigator.serviceWorker.ready')
+        await page.reload()
+        await wait_js(page, '!!navigator.serviceWorker.controller', 10000)
+        await ctx.set_offline(True)
+        await page.reload()
+        await page.wait_for_selector('.tabbar')
+        await page.evaluate('window.__shoh.start("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "w", "pawn")')
+        await wait_js(page, 'window.__shoh.state.analysis !== null', 30000)
+        check(True, 'офлайн: приложение открылось, движок работает')
+        await ctx.set_offline(False)
+
+    overflow = await page.evaluate('document.documentElement.scrollWidth - document.documentElement.clientWidth')
+    check(overflow <= 0, f'телефон: без горизонтального скролла ({overflow}px)')
+    errors = [e for e in errors if 'ERR_INTERNET_DISCONNECTED' not in e and 'fonts.g' not in e]
+    check(not errors, 'телефон: консоль без ошибок' + ('' if not errors else f': {errors[:3]}'))
+    await ctx.close()
 
 
 def main():

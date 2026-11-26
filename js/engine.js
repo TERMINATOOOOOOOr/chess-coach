@@ -79,9 +79,9 @@ export class Engine {
    * и видит повторения (иначе в выигранной позиции он может сыграть вничью троекратным повтором).
    * @returns {Promise<{fen:string, lines:Array, bestmove:string|null, cancelled:boolean}>}
    */
-  analyse(fen, { depth = 12, multipv = 1, movetime = 0, moves = [] } = {}) {
+  analyse(fen, { depth = 12, multipv = 1, movetime = 0, moves = [], searchmoves = [] } = {}) {
     return new Promise((resolve) => {
-      this.queue.push({ fen, moves, depth, multipv, movetime, resolve });
+      this.queue.push({ fen, moves, depth, multipv, movetime, searchmoves, resolve });
       this._pump();
     });
   }
@@ -129,6 +129,7 @@ export class Engine {
       this.send(`position fen ${job.fen}${job.moves.length ? ` moves ${job.moves.join(' ')}` : ''}`);
       let go = `go depth ${job.depth}`;
       if (job.movetime) go += ` movetime ${job.movetime}`;
+      if (job.searchmoves.length) go += ` searchmoves ${job.searchmoves.join(' ')}`; // по UCI — в конце
       this.send(go);
     });
     this.current = null;

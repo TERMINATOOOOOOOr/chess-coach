@@ -6,5 +6,12 @@
     "test": "node --test tests/*.test.mjs",
     "e2e": "python tests/e2e.py",
     "build": "python tools/bundle.py"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.3",
+    "@capacitor/core": "8.6.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.3"
   }
 }

@@ -615,29 +615,35 @@ function renderBots() {
   }
 }
 
-function openSetup() {
+function openSetup({ color = null } = {}) {
   renderBots();
   const form = $('setup-form');
-  for (const r of form.elements.color) r.checked = r.value === state.colorChoice;
-  $('setup-cancel').hidden = !state.started;
+  const fromPos = !!state.pendingFen;
+  $('setup-eyebrow').textContent = fromPos ? 'Доиграть позицию из партии' : 'Новая партия';
+  $('setup-title').textContent = fromPos ? 'С кем доиграем?' : 'С кем сыграем?';
+  const pick = color || state.colorChoice;
+  for (const r of form.elements.color) {
+    r.checked = r.value === pick;
+    r.disabled = fromPos && r.value !== pick; // в позиции из партии играем за свой цвет
+  }
   $('setup').returnValue = '';
   $('setup').showModal();
 }
 
 $('setup').addEventListener('close', () => {
+  const fen = state.pendingFen;
+  state.pendingFen = null;
   if ($('setup').returnValue !== 'start') {
-    if (!state.started) $('setup').showModal();
+    $('btn-choose').hidden = state.started;
     return;
   }
   const form = $('setup-form');
   state.bot = botById(form.elements.bot.value);
   state.colorChoice = form.elements.color.value;
   store.set('bot', state.bot.id);
-  store.set('color', state.colorChoice);
-  startGame();
-});
-$('setup').addEventListener('cancel', (e) => {
-  if (!state.started) e.preventDefault();
+  if (!fen) store.set('color', state.colorChoice);
+  $('btn-choose').hidden = true;
+  startGame({ fen });
 });
 
 function showResult() {
@@ -719,6 +725,7 @@ for (const [id, key] of [['tg-top', 'top'], ['tg-threat', 'threat'], ['tg-commen
 
 document.addEventListener('keydown', (e) => {
   if (e.target.closest('input, textarea') || document.querySelector('dialog[open]')) return;
+  if (document.body.dataset.screen && document.body.dataset.screen !== 'play') return;
   if (e.key === 'h' || e.key === 'р') requestHint();
   if ((e.key === 'z' || e.key === 'я') && (e.ctrlKey || e.metaKey)) {
     e.preventDefault();
@@ -732,7 +739,22 @@ syncBoard(false);
 setEval(state.evalWhite);
 renderAll();
 renderCoachStatus();
-openSetup();
+$('btn-choose').addEventListener('click', () => openSetup());
+
+/** Экран «Играть» открыт: если партии ещё нет — предложить соперника. */
+export function enterPlay() {
+  $('btn-choose').hidden = state.started;
+  if (!state.started && !$('setup').open && !$('result').open) openSetup();
+}
+
+/** «Доиграть отсюда»: позиция из разбора партии, игрок за color. */
+export function playFromPosition(fen, color) {
+  state.pendingFen = fen;
+  openSetup({ color });
+}
+
+/** Идёт партия с ботом (на это время фоновый разбор встаёт на паузу). */
+export const isPlaying = () => state.started && !state.over;
 
 // для e2e-тестов: старт из произвольной позиции
 window.__shoh = {
@@ -741,6 +763,7 @@ window.__shoh = {
     state.bot = botById(botId);
     state.colorChoice = color;
     state.started = true;
+    state.pendingFen = null;
     if ($('setup').open) $('setup').close('hook');
     if ($('result').open) $('result').close('hook');
     return startGame({ fen });

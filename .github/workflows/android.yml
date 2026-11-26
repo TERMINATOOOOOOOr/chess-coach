@@ -1,0 +1,72 @@
+name: APK для Android
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Веб-часть
+        run: |
+          npm ci
+          python tools/build_site.py
+          npx cap sync android
+
+      - name: Ключ подписи из секретов
+        env:
+          KEYSTORE_B64: ${{ secrets.SHOH_KEYSTORE_B64 }}
+        run: |
+          test -n "$KEYSTORE_B64" || { echo "Нет секрета SHOH_KEYSTORE_B64"; exit 1; }
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/shoh.p12"
+
+      - name: Сборка release APK
+        working-directory: android
+        env:
+          SHOH_KEYSTORE: ${{ runner.temp }}/shoh.p12
+          SHOH_KEYSTORE_PASSWORD: ${{ secrets.SHOH_KEYSTORE_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon -PversionCode=${{ github.run_number }} -PversionName=1.${{ github.run_number }}
+
+      - name: Проверка подписи
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk shoh.apk
+          BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          "$BT/apksigner" verify --verbose --print-certs shoh.apk
+          ls -la shoh.apk
+
+      - name: Релиз
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.${{ github.run_number }}
+          name: Shoh 1.${{ github.run_number }}
+          files: shoh.apk
+          make_latest: true
+          body: |
+            Шахматный тренер Shoh для Android.
+
+            Установка: скачай `shoh.apk` на телефон, открой и разреши установку из этого источника.
+            Новые версии ставятся поверх старой, партии и разборы сохраняются.

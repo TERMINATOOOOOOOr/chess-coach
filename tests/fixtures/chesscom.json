@@ -1,0 +1,86 @@
+{
+ "2026/11": {
+  "games": [
+   {
+    "url": "https://www.chess.com/game/live/100000001",
+    "pgn": "[Event \"Live Chess\"]\n[Site \"Chess.com\"]\n[Date \"2026.11.24\"]\n[White \"OpponentOne\"]\n[Black \"TestPlayer\"]\n[Result \"1-0\"]\n[TimeControl \"180+2\"]\n[Link \"https://www.chess.com/game/live/100000001\"]\n\n1. e4 {[%clk 0:02:57]} 1... e5 {[%clk 0:02:57]} 2. Bc4 {[%clk 0:02:54]} 2... Nc6 {[%clk 0:02:54]} 3. Qh5 {[%clk 0:02:51]} 3... Nf6 {[%clk 0:02:51]} 4. Qxf7# {[%clk 0:02:48]} 1-0\n",
+    "time_control": "180+2",
+    "end_time": 1795536000,
+    "rated": true,
+    "time_class": "blitz",
+    "rules": "chess",
+    "white": {
+     "rating": 1210,
+     "result": "win",
+     "username": "OpponentOne"
+    },
+    "black": {
+     "rating": 1185,
+     "result": "checkmated",
+     "username": "TestPlayer"
+    }
+   },
+   {
+    "url": "https://www.chess.com/game/live/100000002",
+    "pgn": "[Event \"Live Chess\"]\n[Site \"Chess.com\"]\n[Date \"2026.11.24\"]\n[White \"TestPlayer\"]\n[Black \"OpponentTwo\"]\n[Result \"1-0\"]\n[TimeControl \"600\"]\n[Link \"https://www.chess.com/game/live/100000002\"]\n\n1. e4 {[%clk 0:02:57]} 1... e5 {[%clk 0:02:57]} 2. Nf3 {[%clk 0:02:54]} 2... d6 {[%clk 0:02:54]} 3. Bc4 {[%clk 0:02:51]} 3... Bg4 {[%clk 0:02:51]} 4. Nc3 {[%clk 0:02:48]} 4... g6 {[%clk 0:02:48]} 5. Nxe5 {[%clk 0:02:45]} 5... Bxd1 {[%clk 0:02:45]} 6. Bxf7+ {[%clk 0:02:42]} 6... Ke7 {[%clk 0:02:42]} 7. Nd5# {[%clk 0:02:39]} 1-0\n",
+    "time_control": "600",
+    "end_time": 1795636000,
+    "rated": true,
+    "time_class": "rapid",
+    "rules": "chess",
+    "white": {
+     "rating": 1190,
+     "result": "win",
+     "username": "TestPlayer"
+    },
+    "black": {
+     "rating": 1175,
+     "result": "checkmated",
+     "username": "OpponentTwo"
+    }
+   },
+   {
+    "url": "https://www.chess.com/game/live/100000003",
+    "pgn": "[Event \"Live Chess\"]\n[Site \"Chess.com\"]\n[Date \"2026.11.24\"]\n[White \"TestPlayer\"]\n[Black \"Chess960Guy\"]\n[Result \"1-0\"]\n[TimeControl \"180\"]\n[Link \"https://www.chess.com/game/live/100000003\"]\n\n1. e4 {[%clk 0:02:57]} 1... e5 {[%clk 0:02:57]} 1-0\n",
+    "time_control": "180",
+    "end_time": 1795586000,
+    "rated": true,
+    "time_class": "blitz",
+    "rules": "chess960",
+    "white": {
+     "rating": 1500,
+     "result": "win",
+     "username": "TestPlayer"
+    },
+    "black": {
+     "rating": 1480,
+     "result": "resigned",
+     "username": "Chess960Guy"
+    }
+   }
+  ]
+ },
+ "2026/10": {
+  "games": [
+   {
+    "url": "https://www.chess.com/game/daily/200000004",
+    "pgn": "[Event \"Live Chess\"]\n[Site \"Chess.com\"]\n[Date \"2026.11.24\"]\n[White \"OpponentThree\"]\n[Black \"TestPlayer\"]\n[Result \"1/2-1/2\"]\n[TimeControl \"1/86400\"]\n[Link \"https://www.chess.com/game/daily/200000004\"]\n\n1. e4 {[%clk 0:02:57]} 1... e5 {[%clk 0:02:57]} 2. Nf3 {[%clk 0:02:54]} 2... Nc6 {[%clk 0:02:54]} 1/2-1/2\n",
+    "time_control": "1/86400",
+    "end_time": 1793436000,
+    "rated": true,
+    "time_class": "daily",
+    "rules": "chess",
+    "white": {
+     "rating": 1300,
+     "result": "agreed",
+     "username": "OpponentThree"
+    },
+    "black": {
+     "rating": 1195,
+     "result": "agreed",
+     "username": "TestPlayer"
+    }
+   }
+  ]
+ }
+}

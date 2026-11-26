@@ -7,6 +7,7 @@ import { Chess } from '../vendor/chess.js';
 import { Engine } from '../js/engine.js';
 import { evaluateMove, explainMove, describeThreat, nullMoveFen, hint } from '../js/coach.js';
 import { pickBotMove, BOTS } from '../js/bots.js';
+import { analyzeGame } from '../js/review.js';
 
 const src = fs.readFileSync(new URL('../vendor/stockfish.js', import.meta.url), 'utf8');
 const prefix =
@@ -88,6 +89,22 @@ test('с историей ходов движок видит троекратн�
   for (const m of moves) c.move(m.length === 4 ? { from: m.slice(0, 2), to: m.slice(2) } : m);
   const noHistory = await engine.analyse(c.fen(), { depth: 10 });
   assert.ok(noHistory.lines[0].cp < -500, `оценка ${noHistory.lines[0].cp}`);
+});
+
+test('разбор настоящей партии с chess.com на Stockfish', { timeout: 90000 }, async () => {
+  const fixture = JSON.parse(fs.readFileSync(new URL('./fixtures/chesscom.json', import.meta.url), 'utf8'));
+  const pgn = fixture['2026/11'].games[0].pgn; // 1.e4 e5 2.Сc4 Кc6 3.Фh5 Кf6?? 4.Фxf7#
+  let progress = 0;
+  const review = await analyzeGame({ pgn }, engine, { mode: 'fast', onProgress: (p) => (progress = p) });
+  assert.equal(progress, 1);
+  const nf6 = review.plies[5];
+  assert.equal(nf6.ru, 'Кf6');
+  assert.equal(nf6.cls, 'blunder');
+  assert.equal(nf6.type, 'allowed_mate');
+  assert.match(nf6.comment, /мат/);
+  assert.equal(review.plies[6].cls, 'best');
+  assert.ok(review.sides.w.accuracy > review.sides.b.accuracy);
+  assert.deepEqual(review.keyMoments, [5]);
 });
 
 test('отмена анализа не вешает очередь', { timeout: 60000 }, async () => {

@@ -2,9 +2,13 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Shoh — шахматный тренер</title>
-  <meta name="description" content="Играй с ботами, а ИИ-тренер подсказывает ходы, предупреждает об угрозах и объясняет ошибки.">
+  <meta name="description" content="Играй с ботами, а ИИ-тренер подсказывает ходы, предупреждает об угрозах и разбирает твои партии с chess.com.">
+  <meta name="theme-color" content="#0e0f12">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=JetBrains+Mono:wght@500;700&family=Manrope:wght@400;500;600;700;800&display=swap">
@@ -17,14 +21,29 @@
   <header class="top">
     <a class="brand" href="#" aria-label="Shoh — шахматный тренер">
       <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
-        <circle cx="20" cy="20" r="18.5" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".45"/>
-        <path d="M20 6v6M17 9h6M13.5 30h13l-1.6-9.5c2.2-1 3.6-3 3.6-5.2 0-3-2.6-5.3-6-5.3-1.3 0-2.5.4-3.5 1-1-.6-2.2-1-3.5-1-3.4 0-6 2.3-6 5.3 0 2.2 1.4 4.2 3.6 5.2L13.5 30z" fill="currentColor"/>
-        <rect x="11.5" y="31" width="17" height="3" rx="1.5" fill="currentColor"/>
-      </svg>
+        <circle cx="20" cy="20" r="18.5" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".45"/><g fill="currentColor"><path d="M18.8 3h2.4v2.6h2.6V8h-2.6v2.6h-2.4V8h-2.6V5.6h2.6z"/><path d="M20 10.6c-4.3 0-7.3 2.4-7.3 5.5 0 .4 0 .7.1 1.1h14.4c.1-.4.1-.7.1-1.1 0-3.1-3-5.5-7.3-5.5z"/><rect x="12.4" y="18.1" width="15.2" height="2.7" rx="1.35"/><path d="M15 21.7h10c-1.7 2.4-1.7 4.9 1.6 7.7H13.4c3.3-2.8 3.3-5.3 1.6-7.7z"/><rect x="11" y="30.2" width="18" height="3.7" rx="1.85"/></g></svg>
       <span class="brand-name">Shoh</span>
       <span class="brand-sub">шахматный тренер</span>
     </a>
-    <div class="top-actions">
+    <nav class="tabbar" aria-label="Разделы">
+      <button type="button" data-tab="play">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3m-1.5-1.5h3M8 21h8l-1-6c1.4-.7 2.3-2 2.3-3.5C17.3 9.6 15.6 8 13.5 8c-.6 0-1.1.1-1.5.4-.4-.3-.9-.4-1.5-.4C8.4 8 6.7 9.6 6.7 11.5c0 1.5.9 2.8 2.3 3.5L8 21z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/></svg>
+        <span>Играть</span>
+      </button>
+      <button type="button" data-tab="games">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+        <span>Партии</span>
+      </button>
+      <button type="button" data-tab="progress">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M6 15l4-4 3 3 5-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Прогресс</span>
+      </button>
+      <button type="button" data-tab="settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.5-2-3.4-2.3 1a7.4 7.4 0 0 0-1.7-1L15 3.6h-4l-.4 2.5a7.4 7.4 0 0 0-1.7 1l-2.3-1-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2 1.5 2 3.4 2.3-1c.5.4 1.1.8 1.7 1l.4 2.5h4l.4-2.5c.6-.2 1.2-.6 1.7-1l2.3 1 2-3.4-2-1.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        <span>Настройки</span>
+      </button>
+    </nav>
+    <div class="top-actions play-only">
       <button class="btn ghost" id="btn-flip" type="button" title="Перевернуть доску">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v13m0 0-3-3m3 3 3-3M17 20V7m0 0-3 3m3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span>Перевернуть</span>
@@ -33,7 +52,8 @@
     </div>
   </header>
 
-  <main class="layout">
+  <main>
+  <div class="screen layout" id="screen-play">
     <section class="play" aria-label="Партия">
       <div class="strip" id="strip-top"></div>
       <div class="board-row">
@@ -50,7 +70,7 @@
       <section class="card coach" aria-label="Тренер">
         <div class="coach-head">
           <div class="coach-avatar" aria-hidden="true">
-            <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="23" fill="var(--amber-deep)"/><path d="M24 9v5M21.5 11.5h5M17 34h14l-1.8-10.4c2.3-1.1 3.8-3.2 3.8-5.6 0-3.2-2.8-5.6-6.3-5.6-1.4 0-2.6.4-3.7 1.1-1.1-.7-2.3-1.1-3.7-1.1-3.5 0-6.3 2.4-6.3 5.6 0 2.4 1.5 4.5 3.8 5.6L17 34z" fill="var(--amber)"/><rect x="15" y="35.5" width="18" height="3.2" rx="1.6" fill="var(--amber)"/></svg>
+            <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="23" fill="var(--amber-deep)"/><g fill="var(--amber)" transform="translate(5.6 5.2) scale(.92)"><path d="M18.8 3h2.4v2.6h2.6V8h-2.6v2.6h-2.4V8h-2.6V5.6h2.6z"/><path d="M20 10.6c-4.3 0-7.3 2.4-7.3 5.5 0 .4 0 .7.1 1.1h14.4c.1-.4.1-.7.1-1.1 0-3.1-3-5.5-7.3-5.5z"/><rect x="12.4" y="18.1" width="15.2" height="2.7" rx="1.35"/><path d="M15 21.7h10c-1.7 2.4-1.7 4.9 1.6 7.7H13.4c3.3-2.8 3.3-5.3 1.6-7.7z"/><rect x="11" y="30.2" width="18" height="3.7" rx="1.85"/></g></svg>
           </div>
           <div class="coach-title">
             <b>Тренер</b>
@@ -62,6 +82,7 @@
         <div class="bubble" id="bubble" aria-live="polite">
           <div class="bubble-tag" id="bubble-tag" hidden></div>
           <p class="bubble-text" id="bubble-text">Выбери соперника, и начнём.</p>
+          <button class="btn small primary" id="btn-choose" type="button">Выбрать соперника</button>
           <p class="bubble-chance" id="bubble-chance" hidden></p>
           <p class="bubble-warn" id="bubble-warn" hidden></p>
           <button class="btn small danger-soft" id="btn-retry" type="button" hidden>Взять назад и попробовать снова</button>
@@ -99,11 +120,152 @@
         </div>
       </section>
     </aside>
+  </div>
+
+  <!-- Партии -->
+  <div class="screen page" id="screen-games" hidden>
+    <div class="page-head">
+      <div>
+        <p class="eyebrow" id="games-user">chess.com</p>
+        <h1>Мои партии</h1>
+      </div>
+      <div class="page-actions">
+        <button class="btn small ghost" id="btn-add-game" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <span>Добавить</span>
+        </button>
+        <button class="btn small" id="btn-sync" type="button" title="Проверить новые партии">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8m0-4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16m0 4v-4h-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Обновить</span>
+        </button>
+      </div>
+    </div>
+    <p class="sync-status" id="sync-status" aria-live="polite"></p>
+    <form class="card connect" id="connect" hidden>
+      <b class="card-title">Подключи chess.com</b>
+      <p>Укажи ник, и тренер сам будет подтягивать твои <b>законченные</b> партии и разбирать их: где ошибся, что было лучше, над чем работать.</p>
+      <div class="field-row">
+        <input id="connect-name" type="text" placeholder="ник на chess.com" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Ник на chess.com">
+        <button class="btn primary" type="submit">Подключить</button>
+      </div>
+      <p class="fineprint">Можно и без ника: жми «Добавить» и вставь ссылку или PGN партии. А в приложении chess.com — «Поделиться» → Shoh.</p>
+    </form>
+    <ul class="game-list" id="game-list"></ul>
+    <p class="empty-note" id="games-empty" hidden>Законченных партий за последние два месяца не нашлось. Сыграй на chess.com и нажми «Обновить».</p>
+  </div>
+
+  <!-- Разбор партии -->
+  <div class="screen review" id="screen-review" hidden>
+    <div class="review-head">
+      <a class="btn small ghost" href="#games" aria-label="Назад к партиям">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <div class="review-title">
+        <b id="review-title"></b>
+        <small id="review-sub"></small>
+      </div>
+      <a class="btn small ghost" id="rv-link" href="#" target="_blank" rel="noopener" title="Открыть на chess.com" hidden>chess.com ↗</a>
+    </div>
+    <div class="review-grid">
+      <div class="review-left">
+        <div class="board-row">
+          <div class="evalbar" id="review-evalbar" role="img" aria-label="Оценка позиции"><div class="evalbar-fill"></div><span class="evalbar-num"></span></div>
+          <div class="board-frame"><div id="review-board" aria-label="Доска разбора"></div></div>
+        </div>
+        <div class="review-nav">
+          <button class="btn ghost" id="rv-first" type="button" aria-label="В начало">⏮</button>
+          <button class="btn" id="rv-prev" type="button" aria-label="Предыдущий ход">◀</button>
+          <span class="rv-pos" id="rv-pos">0 / 0</span>
+          <button class="btn" id="rv-next" type="button" aria-label="Следующий ход">▶</button>
+          <button class="btn ghost" id="rv-last" type="button" aria-label="В конец">⏭</button>
+        </div>
+      </div>
+      <div class="review-right">
+        <div class="card review-progress" id="review-progress" hidden>
+          <span id="rv-progress-text">Тренер разбирает партию…</span>
+          <div class="minibar big"><i></i></div>
+        </div>
+        <div class="card review-summary" id="review-summary" hidden></div>
+        <svg class="graph" id="review-graph" role="img" aria-label="График оценки по ходам" hidden></svg>
+        <div class="card coach-note">
+          <div class="bubble-tag" id="rv-tag" hidden></div>
+          <p class="bubble-text" id="rv-text"></p>
+          <div class="rv-extra" id="rv-extra"></div>
+          <button class="btn small primary" id="rv-play" type="button">Доиграть отсюда с ботом</button>
+        </div>
+        <div class="card moments" id="review-moments" hidden></div>
+        <div class="card">
+          <b class="card-title">Ходы</b>
+          <ol class="movelist review-moves" id="review-moves"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Прогресс -->
+  <div class="screen page" id="screen-progress" hidden>
+    <div class="page-head">
+      <div>
+        <p class="eyebrow">по разобранным партиям</p>
+        <h1>Прогресс</h1>
+      </div>
+    </div>
+    <div id="progress-body" class="progress-body"></div>
+  </div>
+
+  <!-- Настройки -->
+  <div class="screen page" id="screen-settings" hidden>
+    <div class="page-head"><div><p class="eyebrow">Shoh</p><h1>Настройки</h1></div></div>
+    <form class="card settings" id="settings-form">
+      <label class="field">
+        <span>Ник на chess.com</span>
+        <span class="field-row">
+          <input id="set-name" type="text" placeholder="например, magnus" autocomplete="off" autocapitalize="off" spellcheck="false">
+          <button class="btn" type="submit">Сохранить</button>
+        </span>
+      </label>
+      <fieldset class="seg">
+        <legend>Разбор партий</legend>
+        <label><input type="radio" name="set-mode" value="accurate"><span>точно</span></label>
+        <label><input type="radio" name="set-mode" value="fast"><span>быстро</span></label>
+      </fieldset>
+      <label class="switch"><input type="checkbox" id="set-autosync"><span class="track"></span><span>Проверять новые партии при запуске</span></label>
+      <label class="switch"><input type="checkbox" id="set-autoreview"><span class="track"></span><span>Сразу разбирать свежие партии</span></label>
+    </form>
+    <section class="card settings">
+      <b class="card-title">Приложение</b>
+      <p class="setting-row" id="apk-row">
+        <span>Приложение для Android (APK)</span>
+        <a class="btn small" id="apk-link" href="#">Скачать</a>
+      </p>
+      <p class="fineprint">В Chrome на Android: меню ⋮ → «Добавить на гл. экран». После этого в chess.com работает «Поделиться» → Shoh.</p>
+      <p class="setting-row">
+        <span>Все партии и разборы хранятся только на этом устройстве</span>
+        <button class="btn small ghost" id="btn-wipe" type="button">Удалить партии с телефона</button>
+      </p>
+    </section>
+    <p class="fineprint">Тренер разбирает только законченные партии из открытого архива chess.com. Подсказок во время игры на chess.com нет: это нарушило бы правила честной игры.</p>
+  </div>
   </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <dialog class="modal small" id="add-game" aria-labelledby="add-title">
+    <form method="dialog" id="add-form">
+      <p class="eyebrow">Добавить партию</p>
+      <h2 id="add-title">Ссылка или PGN</h2>
+      <textarea id="add-text" rows="6" placeholder="https://www.chess.com/game/live/…&#10;или PGN целиком" aria-label="Ссылка на партию или PGN"></textarea>
+      <p class="form-error" id="add-error" hidden></p>
+      <div class="result-actions">
+        <button class="btn ghost" value="cancel" type="submit" formnovalidate>Отмена</button>
+        <button class="btn primary" value="add" id="add-submit" type="submit">Разобрать</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog class="modal setup" id="setup" aria-labelledby="setup-title">
     <form method="dialog" id="setup-form">
-      <p class="eyebrow">Новая партия</p>
+      <p class="eyebrow" id="setup-eyebrow">Новая партия</p>
       <h2 id="setup-title">С кем сыграем?</h2>
       <div class="bots" id="bots" role="radiogroup" aria-label="Соперник"></div>
       <div class="setup-row">
@@ -138,6 +300,6 @@
     </form>
   </dialog>
 
-  <script type="module" src="js/app.js"></script>
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>
