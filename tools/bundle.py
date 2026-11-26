@@ -9,7 +9,7 @@ import re
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 ORDER = [
     'vendor/chess.js', 'js/coach.js', 'js/engine.js', 'js/bots.js', 'js/board.js',
-    'js/store.js', 'js/chesscom.js', 'js/prefs.js', 'js/ui/dom.js', 'js/review.js', 'js/reviewer.js',
+    'js/store.js', 'js/chesscom.js', 'js/prefs.js', 'js/ui/dom.js', 'js/updater.js', 'js/review.js', 'js/reviewer.js',
     'js/ui/tabs.js', 'js/app.js', 'js/ui/games.js', 'js/ui/review.js', 'js/ui/progress.js', 'js/ui/settings.js',
     'js/main.js',
 ]

@@ -22,6 +22,7 @@ const ASSETS = [
   'js/chesscom.js',
   'js/review.js',
   'js/reviewer.js',
+  'js/updater.js',
   'js/store.js',
   'js/prefs.js',
   'js/ui/dom.js',

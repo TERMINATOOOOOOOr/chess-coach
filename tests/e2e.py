@@ -27,11 +27,11 @@ def free_port():
 
 
 @contextlib.contextmanager
-def server():
+def server(root=ROOT):
     port = free_port()
     proc = subprocess.Popen(
         [sys.executable, '-m', 'http.server', str(port), '--bind', '127.0.0.1'],
-        cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        cwd=root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
     try:
         for _ in range(50):

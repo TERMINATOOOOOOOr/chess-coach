@@ -503,6 +503,11 @@ input[type="text"]:focus, textarea:focus { border-color: var(--amber); box-shado
 .trend.down { color: #ff8f86; }
 .spark { display: block; width: 100%; height: 70px; }
 .spark-note { color: var(--faint); font-size: 13px; margin: 0; }
+.upd-status { margin: 8px 0 0; color: var(--muted); font-size: 13.5px; }
+.upd-status:empty { display: none; }
+.upd-status.ok { color: var(--mint); }
+.upd-status.warn { color: var(--amber); }
+.upd-status.error { color: #ffb1aa; }
 a.btn { text-decoration: none; }
 .spark-area { fill: rgba(244,168,54,.12); }
 .spark-line { fill: none; stroke: var(--amber); stroke-width: 2; stroke-linejoin: round; }

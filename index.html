@@ -232,13 +232,25 @@
       <label class="switch"><input type="checkbox" id="set-autosync"><span class="track"></span><span>Проверять новые партии при запуске</span></label>
       <label class="switch"><input type="checkbox" id="set-autoreview"><span class="track"></span><span>Сразу разбирать свежие партии</span></label>
     </form>
+    <section class="card settings" id="updates-card" hidden>
+      <b class="card-title">Обновления</b>
+      <p class="setting-row">
+        <span id="upd-version">Версия: —</span>
+        <button class="btn small" id="btn-upd-check" type="button" hidden>Проверить</button>
+      </p>
+      <p class="upd-status" id="upd-status" aria-live="polite"></p>
+      <p class="setting-row" id="upd-apk-row" hidden>
+        <span>Для этого обновления нужна новая версия приложения</span>
+        <a class="btn small primary" id="upd-apk-link" href="#" target="_blank" rel="noopener">Скачать APK</a>
+      </p>
+    </section>
     <section class="card settings">
       <b class="card-title">Приложение</b>
       <p class="setting-row" id="apk-row">
         <span>Приложение для Android (APK)</span>
         <a class="btn small" id="apk-link" href="#">Скачать</a>
       </p>
-      <p class="fineprint">В Chrome на Android: меню ⋮ → «Добавить на гл. экран». После этого в chess.com работает «Поделиться» → Shoh.</p>
+      <p class="fineprint" id="pwa-hint">В Chrome на Android: меню ⋮ → «Добавить на гл. экран». После этого в chess.com работает «Поделиться» → Shoh.</p>
       <p class="setting-row">
         <span>Все партии и разборы хранятся только на этом устройстве</span>
         <button class="btn small ghost" id="btn-wipe" type="button">Удалить партии с телефона</button>

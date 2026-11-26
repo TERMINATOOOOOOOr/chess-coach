@@ -3,11 +3,13 @@ name: APK для Android
 on:
   push:
     branches: [main]
-    # правки тестов и документации не выпускают новый APK
-    paths-ignore:
-      - 'tests/**'
-      - '**.md'
-      - 'dist/**'
+    # веб-часть доезжает до телефона сама (js/updater.js), новый APK нужен только при изменении нативной части
+    paths:
+      - 'android/**'
+      - 'capacitor.config.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/android.yml'
   workflow_dispatch:
 
 permissions:

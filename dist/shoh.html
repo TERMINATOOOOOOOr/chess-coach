@@ -531,6 +531,11 @@ input[type="text"]:focus, textarea:focus { border-color: var(--amber); box-shado
 .trend.down { color: #ff8f86; }
 .spark { display: block; width: 100%; height: 70px; }
 .spark-note { color: var(--faint); font-size: 13px; margin: 0; }
+.upd-status { margin: 8px 0 0; color: var(--muted); font-size: 13.5px; }
+.upd-status:empty { display: none; }
+.upd-status.ok { color: var(--mint); }
+.upd-status.warn { color: var(--amber); }
+.upd-status.error { color: #ffb1aa; }
 a.btn { text-decoration: none; }
 .spark-area { fill: rgba(244,168,54,.12); }
 .spark-line { fill: none; stroke: var(--amber); stroke-width: 2; stroke-linejoin: round; }
@@ -836,13 +841,25 @@ a.btn { text-decoration: none; }
       <label class="switch"><input type="checkbox" id="set-autosync"><span class="track"></span><span>Проверять новые партии при запуске</span></label>
       <label class="switch"><input type="checkbox" id="set-autoreview"><span class="track"></span><span>Сразу разбирать свежие партии</span></label>
     </form>
+    <section class="card settings" id="updates-card" hidden>
+      <b class="card-title">Обновления</b>
+      <p class="setting-row">
+        <span id="upd-version">Версия: —</span>
+        <button class="btn small" id="btn-upd-check" type="button" hidden>Проверить</button>
+      </p>
+      <p class="upd-status" id="upd-status" aria-live="polite"></p>
+      <p class="setting-row" id="upd-apk-row" hidden>
+        <span>Для этого обновления нужна новая версия приложения</span>
+        <a class="btn small primary" id="upd-apk-link" href="#" target="_blank" rel="noopener">Скачать APK</a>
+      </p>
+    </section>
     <section class="card settings">
       <b class="card-title">Приложение</b>
       <p class="setting-row" id="apk-row">
         <span>Приложение для Android (APK)</span>
         <a class="btn small" id="apk-link" href="#">Скачать</a>
       </p>
-      <p class="fineprint">В Chrome на Android: меню ⋮ → «Добавить на гл. экран». После этого в chess.com работает «Поделиться» → Shoh.</p>
+      <p class="fineprint" id="pwa-hint">В Chrome на Android: меню ⋮ → «Добавить на гл. экран». После этого в chess.com работает «Поделиться» → Shoh.</p>
       <p class="setting-row">
         <span>Все партии и разборы хранятся только на этом устройстве</span>
         <button class="btn small ghost" id="btn-wipe" type="button">Удалить партии с телефона</button>
@@ -4556,6 +4573,226 @@ function formatDate(unixSec) {
 
 return { byId, h, svgEl, bus, emit, on, toast, formatDate };
 })();
+const { UPDATE_BASE, isNewer, missingPlugins, planFiles, decideOnBoot, sha256Hex, toBase64, updatesSupported, updateState, runningVersion, updaterBoot, confirmBoot, checkForUpdate } = (() => {
+// ── js/updater.js ──
+// Живые обновления веб-части внутри APK (Capacitor), как у игр из магазина:
+//   1) при запуске тихо сверяемся с version.json на GitHub Pages;
+//   2) скачиваем только изменившиеся файлы, каждый проверяем по sha256, кладём в папку www-<версия>;
+//   3) при следующем запуске переключаемся на неё (WebView.setServerBasePath);
+//   4) новая версия, успешно запустившись, закрепляет себя (persistServerBasePath).
+// Если новая версия не дошла до подтверждения, переключение не закреплено и следующий запуск
+// вернётся к прежней; после двух неудач версия помечается плохой. На сайте и в однофайловой
+// версии модуль ничего не делает: там обновляет service worker.
+
+const UPDATE_BASE = 'https://terminatooooooor.github.io/chess-coach/';
+const KEYS = { ready: 'shoh.update.ready', trying: 'shoh.update.trying', bad: 'shoh.update.bad' };
+const MAX_TRIES = 2;
+
+// ───────────────────────── чистые функции ─────────────────────────
+
+/** Удалённая версия новее запущенной. */
+function isNewer(remote, local) {
+  return !!(remote && local && remote.version && remote.version !== local.version && (remote.built || 0) > (local.built || 0));
+}
+
+/** Каких нативных плагинов не хватает для этой версии (тогда нужен новый APK). */
+function missingPlugins(remote, isAvailable) {
+  return (remote.requires || []).filter((n) => !isAvailable(n));
+}
+
+/**
+ * Что скачать, а что скопировать с устройства. HTML всегда качаем:
+ * Capacitor встраивает в отдаваемый index.html свой скрипт, и копия не совпала бы по sha.
+ */
+function planFiles(remote, local) {
+  const download = [];
+  const copy = [];
+  for (const [path, sha] of Object.entries(remote.files || {})) {
+    if (!path.endsWith('.html') && local && local.files && local.files[path] === sha) copy.push(path);
+    else download.push(path);
+  }
+  return { download, copy };
+}
+
+/** Решение при запуске: переключиться, подтвердить, выбросить устаревшее или пометить плохим. */
+function decideOnBoot({ ready, trying, bad = [] }, running) {
+  if (!running) return { action: 'none' };
+  if (trying && trying.version === running.version) return { action: 'confirm' };
+  if (!ready) return { action: 'none' };
+  if (bad.includes(ready.version) || !isNewer(ready, running)) return { action: 'drop' };
+  const tries = trying && trying.version === ready.version ? trying.count : 0;
+  if (tries >= MAX_TRIES) return { action: 'mark-bad' };
+  return { action: 'switch', tries: tries + 1 };
+}
+
+async function sha256Hex(buf) {
+  const d = await crypto.subtle.digest('SHA-256', buf);
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function toBase64(buf) {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+// ───────────────────────── работа в APK ─────────────────────────
+
+const cap = () => {
+  const c = typeof window !== 'undefined' ? window.Capacitor : null;
+  return c && typeof c.isNativePlatform === 'function' && c.isNativePlatform() ? c : null;
+};
+const plugin = (name) => {
+  const c = cap();
+  if (!c) return null;
+  return (c.Plugins && c.Plugins[name]) || (c.registerPlugin ? c.registerPlugin(name) : null);
+};
+
+/** Есть ли в установленном APK всё нужное для живых обновлений. */
+const updatesSupported = () => {
+  const c = cap();
+  return !!c && ['Filesystem', 'Preferences', 'WebView'].every((n) => c.isPluginAvailable(n));
+};
+
+/** Текущее состояние — для экрана настроек. */
+const updateState = { running: null, status: 'idle', remote: null, error: null, progress: 0, justUpdated: false };
+
+function setStatus(status, extra = {}) {
+  Object.assign(updateState, { status }, extra);
+  emit('update-status', updateState);
+}
+
+async function prefGet(key) {
+  const r = await plugin('Preferences').get({ key });
+  return r && r.value ? JSON.parse(r.value) : null;
+}
+const prefSet = (key, v) => plugin('Preferences').set({ key, value: JSON.stringify(v) });
+const prefDel = (key) => plugin('Preferences').remove({ key });
+
+async function readLocalManifest() {
+  try {
+    const r = await fetch('./version.json', { cache: 'no-store' });
+    return r.ok ? await r.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Версия, которая сейчас запущена (на сайте тоже, для показа в настройках). */
+async function runningVersion() {
+  if (!updateState.running) updateState.running = await readLocalManifest();
+  return updateState.running;
+}
+
+/** Первым делом при запуске. 'switching' — приложение уже перезагружается в новую версию. */
+async function updaterBoot() {
+  if (!updatesSupported()) return 'off';
+  const running = await runningVersion();
+  if (!running) return 'off';
+  const st = { ready: await prefGet(KEYS.ready), trying: await prefGet(KEYS.trying), bad: (await prefGet(KEYS.bad)) || [] };
+  const d = decideOnBoot(st, running);
+  if (d.action === 'switch') {
+    await prefSet(KEYS.trying, { version: st.ready.version, count: d.tries });
+    await plugin('WebView').setServerBasePath({ path: st.ready.dir });
+    return 'switching';
+  }
+  if (d.action === 'mark-bad') {
+    await prefSet(KEYS.bad, [...st.bad, st.ready.version].slice(-10));
+    await prefDel(KEYS.ready);
+    await prefDel(KEYS.trying);
+  } else if (d.action === 'drop') {
+    await prefDel(KEYS.ready);
+  }
+  updateState.pendingConfirm = d.action === 'confirm';
+  return d.action;
+}
+
+/** Приложение запустилось без ошибок: закрепляем версию, чистим старые папки. */
+async function confirmBoot() {
+  if (!updateState.pendingConfirm) return;
+  updateState.pendingConfirm = false;
+  const W = plugin('WebView');
+  await W.persistServerBasePath();
+  await prefDel(KEYS.trying);
+  await prefDel(KEYS.ready);
+  setStatus('latest', { justUpdated: true });
+  try {
+    await cleanup((await W.getServerBasePath()).path);
+  } catch {
+    /* не критично */
+  }
+}
+
+async function cleanup(currentPath) {
+  const FS = plugin('Filesystem');
+  const { files } = await FS.readdir({ path: '', directory: 'DATA' });
+  const keep = new Set([currentPath ? currentPath.split('/').filter(Boolean).pop() : null]);
+  const ready = await prefGet(KEYS.ready);
+  if (ready) keep.add(ready.dir.split('/').filter(Boolean).pop());
+  for (const f of files || []) {
+    const name = typeof f === 'string' ? f : f.name;
+    if (name && name.startsWith('www-') && !keep.has(name)) await FS.rmdir({ path: name, directory: 'DATA', recursive: true });
+  }
+}
+
+let checking = null;
+/** Проверить и, если есть, скачать обновление. manual — нажали кнопку (показываем ошибки). */
+function checkForUpdate({ manual = false } = {}) {
+  if (!checking) checking = doCheck(manual).finally(() => (checking = null));
+  return checking;
+}
+
+async function doCheck(manual) {
+  if (!updatesSupported() || !(await runningVersion())) return;
+  setStatus('checking', { error: null });
+  try {
+    const r = await fetch(`${UPDATE_BASE}version.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!r.ok) throw new Error(`сервер обновлений ответил ${r.status}`);
+    const remote = await r.json();
+    updateState.remote = remote;
+    if (!isNewer(remote, updateState.running)) return setStatus('latest');
+    if (((await prefGet(KEYS.bad)) || []).includes(remote.version)) return setStatus('latest');
+    const ready = await prefGet(KEYS.ready);
+    if (ready && ready.version === remote.version) return setStatus('ready');
+    if (missingPlugins(remote, (n) => cap().isPluginAvailable(n)).length) return setStatus('need-apk');
+    await download(remote);
+    setStatus('ready', { manual });
+  } catch (e) {
+    setStatus(manual ? 'error' : 'idle', { error: e instanceof TypeError ? 'нет связи с сервером обновлений' : e.message });
+  }
+}
+
+async function download(remote) {
+  const FS = plugin('Filesystem');
+  const dir = `www-${remote.version}`;
+  const { download: dl, copy } = planFiles(remote, updateState.running);
+  const all = [...copy.map((p) => [p, true]), ...dl.map((p) => [p, false])];
+  let done = 0;
+  for (const [path, local] of all) {
+    const url = local ? `./${path}` : `${UPDATE_BASE}${path}?v=${remote.version}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`не скачался ${path} (${res.status})`);
+    const buf = await res.arrayBuffer();
+    if ((await sha256Hex(buf)) !== remote.files[path]) throw new Error(`файл ${path} пришёл повреждённым`);
+    await FS.writeFile({ path: `${dir}/${path}`, data: toBase64(buf), directory: 'DATA', recursive: true });
+    done++;
+    setStatus('downloading', { progress: done / all.length });
+  }
+  await FS.writeFile({
+    path: `${dir}/version.json`,
+    data: toBase64(new TextEncoder().encode(JSON.stringify(remote))),
+    directory: 'DATA',
+    recursive: true,
+  });
+  const { uri } = await FS.getUri({ path: dir, directory: 'DATA' });
+  const path = decodeURIComponent(uri.replace(/^file:\/\//, ''));
+  await prefSet(KEYS.ready, { version: remote.version, built: remote.built, dir: path });
+  updateState.downloaded = { download: dl.length, copy: copy.length };
+}
+
+return { UPDATE_BASE, isNewer, missingPlugins, planFiles, decideOnBoot, sha256Hex, toBase64, updatesSupported, updateState, runningVersion, updaterBoot, confirmBoot, checkForUpdate };
+})();
 const { REVIEW_VERSION, REVIEW_MODES, ERROR_TYPES, PHASES, gamePositions, phaseOf, errorType, analyzeGame, buildReview, winSeries, progressStats } = (() => {
 // ── js/review.js ──
 // Разбор законченной партии: один анализ движка на позицию.
@@ -6351,9 +6588,70 @@ const { APK_URL, initSettings } = (() => {
 
 
 
+
 const APK_URL = 'https://github.com/TERMINATOOOOOOOr/chess-coach/releases/latest/download/shoh.apk';
 
+const fmtBuilt = (ts) =>
+  new Date(ts * 1000).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+/** Версия сайта из <meta>, которую вписывает tools/build_site.py (в разработке её нет). */
+function webVersion() {
+  const m = document.querySelector('meta[name="shoh-version"]');
+  return m ? { version: m.content, built: +m.dataset.built } : null;
+}
+
+/** Блок «Обновления»: версия, статус живого обновления APK, кнопка «Проверить». */
+async function initUpdates() {
+  const native = updatesSupported();
+  const v = native ? await runningVersion() : webVersion();
+  if (!v) return; // разработка и однофайловая версия для компьютера — без версии
+  byId('updates-card').hidden = false;
+  byId('btn-upd-check').hidden = !native;
+  byId('upd-apk-link').href = APK_URL;
+  let toastedReady = false;
+  let toastedApk = false;
+  const render = () => {
+    const running = updateState.running || v;
+    byId('upd-version').textContent = `Версия от ${fmtBuilt(running.built)}`;
+    let text = '';
+    let cls = '';
+    if (!native) text = 'Обновляется автоматически при открытии.';
+    else {
+      const st = updateState.status;
+      if (st === 'checking') text = 'Проверяю обновления…';
+      else if (st === 'downloading') text = `Скачиваю обновление… ${Math.round(updateState.progress * 100)}%`;
+      else if (st === 'ready') [text, cls] = ['Обновление скачано — включится при следующем запуске Shoh.', 'ok'];
+      else if (st === 'latest') [text, cls] = [updateState.justUpdated ? 'Shoh только что обновился — это последняя версия.' : 'Установлена последняя версия.', 'ok'];
+      else if (st === 'need-apk') [text, cls] = ['Вышла версия, которой нужна новая сборка приложения.', 'warn'];
+      else if (st === 'error') [text, cls] = [`Не получилось проверить: ${updateState.error}`, 'error'];
+    }
+    const s = byId('upd-status');
+    s.textContent = text;
+    s.className = `upd-status ${cls}`;
+    byId('upd-apk-row').hidden = updateState.status !== 'need-apk';
+    byId('btn-upd-check').disabled = ['checking', 'downloading'].includes(updateState.status);
+  };
+  render();
+  on('update-status', (st) => {
+    render();
+    if (st.status === 'ready' && !st.manual && !toastedReady) {
+      toastedReady = true;
+      toast('Обновление Shoh скачано — включится при следующем запуске.');
+    }
+    if (st.status === 'need-apk' && !toastedApk) {
+      toastedApk = true;
+      toast('Вышла новая версия Shoh — скачай APK в «Настройках».');
+    }
+    if (st.justUpdated && st.status === 'latest' && !st.toasted) {
+      st.toasted = true;
+      toast(`Shoh обновился: версия от ${fmtBuilt(st.running.built)}.`);
+    }
+  });
+  byId('btn-upd-check').addEventListener('click', () => checkForUpdate({ manual: true }));
+}
+
 function initSettings({ onUsernameChange }) {
+  initUpdates();
   const name = byId('set-name');
   name.value = prefs.username;
   byId('settings-form').addEventListener('submit', async (e) => {
@@ -6383,6 +6681,7 @@ function initSettings({ onUsernameChange }) {
   // внутри APK ссылка на APK не нужна
   const inApp = !!window.Capacitor;
   byId('apk-row').hidden = inApp;
+  byId('pwa-hint').hidden = inApp;
   byId('apk-link').href = APK_URL;
 
   let armed = null;
@@ -6421,6 +6720,7 @@ return { APK_URL, initSettings };
 
 
 
+
 /** Партия пришла через «Поделиться» (PWA share target или Android-интент в APK). */
 async function handleShared(text) {
   if (!text || !text.trim()) return;
@@ -6436,6 +6736,12 @@ async function handleShared(text) {
 }
 
 async function main() {
+  // APK: если скачано обновление — переключаемся на него сразу, до остальной загрузки
+  try {
+    if ((await updaterBoot()) === 'switching') return;
+  } catch (e) {
+    console.warn('updater', e);
+  }
   await loadPrefs();
   setBusyCheck(() => isPlaying() && currentScreen() === 'play');
   initGames();
@@ -6491,6 +6797,16 @@ async function main() {
   }
   document.body.classList.add('ready');
   byId('splash')?.remove();
+
+  // версия запустилась без ошибок — закрепляем её; потом тихо проверяем обновления
+  if (updatesSupported()) {
+    try {
+      await confirmBoot();
+    } catch (e) {
+      console.warn('updater', e);
+    }
+    setTimeout(() => checkForUpdate(), 4000);
+  }
 }
 
 main();

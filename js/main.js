@@ -7,6 +7,7 @@ import { initGames, renderGames, syncGames, importShared } from './ui/games.js';
 import { initReviewUi, openReview } from './ui/review.js';
 import { renderProgress } from './ui/progress.js';
 import { initSettings } from './ui/settings.js';
+import { updaterBoot, confirmBoot, checkForUpdate, updatesSupported } from './updater.js';
 import { byId, toast } from './ui/dom.js';
 
 /** Партия пришла через «Поделиться» (PWA share target или Android-интент в APK). */
@@ -24,6 +25,12 @@ async function handleShared(text) {
 }
 
 async function main() {
+  // APK: если скачано обновление — переключаемся на него сразу, до остальной загрузки
+  try {
+    if ((await updaterBoot()) === 'switching') return;
+  } catch (e) {
+    console.warn('updater', e);
+  }
   await loadPrefs();
   setBusyCheck(() => isPlaying() && currentScreen() === 'play');
   initGames();
@@ -79,6 +86,16 @@ async function main() {
   }
   document.body.classList.add('ready');
   byId('splash')?.remove();
+
+  // версия запустилась без ошибок — закрепляем её; потом тихо проверяем обновления
+  if (updatesSupported()) {
+    try {
+      await confirmBoot();
+    } catch (e) {
+      console.warn('updater', e);
+    }
+    setTimeout(() => checkForUpdate(), 4000);
+  }
 }
 
 main();

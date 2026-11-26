@@ -47,7 +47,31 @@ def main():
         raise SystemExit(f'эти модули не попадут в офлайн-кеш, добавь их в ASSETS в sw.js: {not_cached}')
     (OUT / 'sw.js').write_text(sw.replace("const VERSION = 'dev';", f"const VERSION = '{version}';"), encoding='utf-8')
     (OUT / '.nojekyll').write_text('', encoding='utf-8')
-    print(f'www/: {len(files) + 1} файлов, версия {version}')
+
+    # манифест для живых обновлений APK (js/updater.js): версия, время сборки, sha256 каждого файла
+    import json
+    import os
+    import time
+    built = int(os.environ.get('SHOH_BUILT') or time.time())
+    # версия видна и сайту — без лишнего запроса (настройки читают <meta>)
+    index = OUT / 'index.html'
+    html = index.read_text(encoding='utf-8')
+    meta = f'<meta name="shoh-version" content="{version}" data-built="{built}">'
+    assert '<meta name="theme-color"' in html
+    index.write_text(html.replace('<meta name="theme-color"', meta + '\n  <meta name="theme-color"', 1), encoding='utf-8')
+    shas = {}
+    for p in sorted(OUT.rglob('*')):
+        rel = p.relative_to(OUT).as_posix()
+        if p.is_file() and rel != 'version.json' and not rel.startswith('.'):
+            shas[rel] = hashlib.sha256(p.read_bytes()).hexdigest()
+    manifest = {
+        'version': version,
+        'built': built,
+        'requires': ['Filesystem', 'Preferences'],  # нативные плагины, без которых версия не встанет
+        'files': shas,
+    }
+    (OUT / 'version.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding='utf-8')
+    print(f'www/: {len(shas) + 1} файлов, версия {version}')
 
 
 if __name__ == '__main__':
