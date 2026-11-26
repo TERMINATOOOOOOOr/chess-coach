@@ -75,11 +75,13 @@ export class Engine {
 
   /**
    * Анализ позиции. Оценки — с точки зрения стороны, чей ход.
+   * С moves позиция задаётся как «стартовый FEN + ходы»: так движок знает историю партии
+   * и видит повторения (иначе в выигранной позиции он может сыграть вничью троекратным повтором).
    * @returns {Promise<{fen:string, lines:Array, bestmove:string|null, cancelled:boolean}>}
    */
-  analyse(fen, { depth = 12, multipv = 1, movetime = 0 } = {}) {
+  analyse(fen, { depth = 12, multipv = 1, movetime = 0, moves = [] } = {}) {
     return new Promise((resolve) => {
-      this.queue.push({ fen, depth, multipv, movetime, resolve });
+      this.queue.push({ fen, moves, depth, multipv, movetime, resolve });
       this._pump();
     });
   }
@@ -124,7 +126,7 @@ export class Engine {
         }
       };
       this.listeners.add(fn);
-      this.send(`position fen ${job.fen}`);
+      this.send(`position fen ${job.fen}${job.moves.length ? ` moves ${job.moves.join(' ')}` : ''}`);
       let go = `go depth ${job.depth}`;
       if (job.movetime) go += ` movetime ${job.movetime}`;
       this.send(go);

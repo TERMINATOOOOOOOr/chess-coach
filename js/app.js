@@ -8,7 +8,8 @@ import {
   describeThreat, nullMoveFen, hint, shortReason, summarize, opposite,
 } from './coach.js';
 
-const COACH = { depth: 12, movetime: 3500 };
+// тренер в позиции игрока считает глубже любого бота, иначе «лучший ход» против сильных ботов проигрывает
+const COACH = { depth: 16, movetime: 2500 };
 const AFTER = { depth: 12, movetime: 3000 };
 const THREAT = { depth: 9, movetime: 1500 };
 
@@ -70,16 +71,24 @@ const board = new Board($('board'), {
 
 // ───────────────────────── анализ тренера ─────────────────────────
 
-function coachAnalyse(fen, multipv, opts) {
-  const key = `${fen}|${multipv}|${opts.depth}`;
+/** uci первых n ходов партии — история для движка. */
+const historyMoves = (n = state.entries.length) => state.entries.slice(0, n).map((e) => e.uci);
+
+/**
+ * Анализ для тренера. fen — текущая позиция; moves — история от state.startFen
+ * (null для искусственных позиций вроде нулевого хода).
+ */
+function coachAnalyse(fen, multipv, opts, moves = null) {
+  const key = moves ? `${state.startFen}|${moves.join(' ')}|${multipv}|${opts.depth}` : `${fen}|${multipv}|${opts.depth}`;
   if (state.cache.has(key)) return state.cache.get(key);
   state.coachBusy++;
   renderCoachStatus();
-  const p = coachEngine.analyse(fen, { ...opts, multipv }).then((r) => {
+  const req = moves ? coachEngine.analyse(state.startFen, { ...opts, multipv, moves }) : coachEngine.analyse(fen, { ...opts, multipv });
+  const p = req.then((r) => {
     state.coachBusy = Math.max(0, state.coachBusy - 1);
     renderCoachStatus();
     if (r.cancelled) state.cache.delete(key);
-    return r;
+    return { ...r, fen };
   });
   state.cache.set(key, p);
   return p;
@@ -95,6 +104,7 @@ async function startGame({ fen = null } = {}) {
   const c = state.colorChoice;
   state.player = c === 'r' ? (Math.random() < 0.5 ? 'w' : 'b') : c;
   state.game = fen ? new Chess(fen) : new Chess();
+  state.startFen = state.game.fen();
   state.entries = [];
   state.over = null;
   state.started = true;
@@ -141,7 +151,7 @@ async function playerTurn() {
   const alive = () => t === state.token && state.game.fen() === fen;
   board.setInteractive(state.player);
   renderStrips();
-  const a = await coachAnalyse(fen, 3, COACH);
+  const a = await coachAnalyse(fen, 3, COACH, historyMoves());
   if (!alive() || a.cancelled) return;
   state.analysis = a;
   if (a.lines[0]) {
@@ -180,7 +190,10 @@ async function onUserMove({ from, to, promotion }) {
     return;
   }
   const uci = mv.from + mv.to + (mv.promotion || '');
-  const entry = { san: mv.san, uci, color: mv.color, fenBefore, fenAfter: state.game.fen(), result: null, comment: null };
+  const entry = {
+    san: mv.san, uci, color: mv.color, fenBefore, fenAfter: state.game.fen(), result: null, comment: null,
+    movesBefore: historyMoves(),
+  };
   state.entries.push(entry);
   board.setInteractive(null);
   resetTurnUi();
@@ -193,9 +206,9 @@ async function onUserMove({ from, to, promotion }) {
 }
 
 async function evaluatePlayerMove(entry, t) {
-  const before = await coachAnalyse(entry.fenBefore, 3, COACH);
+  const before = await coachAnalyse(entry.fenBefore, 3, COACH, entry.movesBefore);
   const after = new Chess(entry.fenAfter);
-  const afterA = after.isGameOver() ? null : await coachAnalyse(entry.fenAfter, 1, AFTER);
+  const afterA = after.isGameOver() ? null : await coachAnalyse(entry.fenAfter, 1, AFTER, [...entry.movesBefore, entry.uci]);
   if (t !== state.token || before.cancelled || (afterA && afterA.cancelled)) return;
   const result = evaluateMove({ fenBefore: entry.fenBefore, uci: entry.uci, before, after: afterA });
   if (!result) return;
@@ -222,7 +235,9 @@ async function botTurn() {
   renderStrips();
   const last = state.entries.at(-1);
   const [a] = await Promise.all([
-    botEngine.analyse(fen, { depth: bot.depth, multipv: bot.multipv, movetime: bot.movetime || 0 }),
+    botEngine.analyse(state.startFen, {
+      depth: bot.depth, multipv: bot.multipv, movetime: bot.movetime || 0, moves: historyMoves(),
+    }),
     sleep(thinkDelay(bot)),
     // бот ждёт, пока тренер оценит ход игрока (но не дольше 5 с), и даёт вердикту повисеть
     last && last.done ? Promise.race([last.done.then(() => sleep(450)), sleep(5000)]) : null,

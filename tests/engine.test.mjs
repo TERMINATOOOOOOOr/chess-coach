@@ -76,6 +76,20 @@ test('все боты делают легальный ход', { timeout: 120000
   await engine.setOption('Skill Level', 20);
 });
 
+test('с историей ходов движок видит троекратное повторение', { timeout: 60000 }, async () => {
+  // у белых лишний ферзь; позиция уже была дважды, ход Крg8 повторяет её в третий раз — ничья
+  const start = '6k1/5ppp/8/8/8/8/5PPP/3Q2K1 w - - 0 1';
+  const moves = ['d1d2', 'g8h8', 'd2d1', 'h8g8', 'd1d2', 'g8h8', 'd2d1'];
+  const withHistory = await engine.analyse(start, { depth: 10, moves });
+  assert.equal(withHistory.lines[0].move, 'h8g8');
+  assert.ok(Math.abs(withHistory.lines[0].cp) <= 5, `оценка ${withHistory.lines[0].cp}`);
+  // та же позиция без истории: чёрные просто проигрывают
+  const c = new Chess(start);
+  for (const m of moves) c.move(m.length === 4 ? { from: m.slice(0, 2), to: m.slice(2) } : m);
+  const noHistory = await engine.analyse(c.fen(), { depth: 10 });
+  assert.ok(noHistory.lines[0].cp < -500, `оценка ${noHistory.lines[0].cp}`);
+});
+
 test('отмена анализа не вешает очередь', { timeout: 60000 }, async () => {
   const p1 = engine.analyse('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', { depth: 30 });
   const p2 = engine.analyse('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1', { depth: 30 });

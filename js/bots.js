@@ -28,9 +28,10 @@ export const BOTS = [
     skill: 12, depth: 10, multipv: 2, random: 0, blunder: 0, temp: 15,
   },
   {
-    id: 'king', piece: 'k', name: 'Король', elo: 2500,
-    about: 'Полная сила движка. Попробуй хотя бы свести вничью.',
-    skill: 20, depth: 18, movetime: 1500, multipv: 1, random: 0, blunder: 0, temp: 0,
+    // слабее тренера (тот считает глубже), чтобы игра по «лучшим ходам» выигрывала
+    id: 'king', piece: 'k', name: 'Король', elo: 2200,
+    about: 'Почти полная сила движка. Без подсказок шансов мало.',
+    skill: 18, depth: 12, movetime: 800, multipv: 1, random: 0, blunder: 0, temp: 0,
   },
 ];
 
