@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
   monthUrls, normalizeGame, fetchRecentGames, parseShared, gameFromPgn, formatTimeControl, findLinkedGame,
+  normalizeUsername,
 } from '../js/chesscom.js';
 import { gamePositions, phaseOf, buildReview, progressStats, winSeries } from '../js/review.js';
 
@@ -43,6 +44,23 @@ test('загрузка партий: два месяца, без шахмат-96
   const games = await fetchRecentGames('TestPlayer', { now: NOW, fetchImpl: archiveFetch });
   assert.deepEqual(games.map((g) => g.id), ['cc-live-100000002', 'cc-live-100000001', 'cc-daily-200000004']);
   assert.equal(games[0].result, 'win');
+});
+
+test('ник из ссылки на профиль, @ника и с пробелами', () => {
+  assert.equal(normalizeUsername('https://www.chess.com/member/megatroneee'), 'megatroneee');
+  assert.equal(normalizeUsername('chess.com/member/Megatroneee/'), 'Megatroneee');
+  assert.equal(normalizeUsername('https://www.chess.com/ru/member/magnus?ref=share'), 'magnus');
+  assert.equal(normalizeUsername('  @hikaru  '), 'hikaru');
+  assert.equal(normalizeUsername('Some_Nick-1'), 'Some_Nick-1');
+  assert.equal(normalizeUsername('   '), '');
+  assert.throws(() => normalizeUsername('https://www.chess.com/game/live/123'), /не похоже на ник/);
+  assert.throws(() => normalizeUsername('ник по-русски'), /не похоже на ник/);
+});
+
+test('загрузка партий по ссылке на профиль', async () => {
+  const games = await fetchRecentGames('https://www.chess.com/member/TestPlayer', { now: NOW, fetchImpl: archiveFetch });
+  assert.equal(games.length, 3);
+  assert.equal(games[0].myColor, 'w');
 });
 
 test('несуществующий игрок даёт понятную ошибку', async () => {

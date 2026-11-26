@@ -1,5 +1,7 @@
 // Экран «Партии»: синхронизация с chess.com, ручное добавление, список с прогрессом разбора.
-import { fetchRecentGames, findLinkedGame, gameFromPgn, parseShared, formatTimeControl, timeClassName } from '../chesscom.js';
+import {
+  fetchRecentGames, findLinkedGame, gameFromPgn, parseShared, formatTimeControl, timeClassName, normalizeUsername,
+} from '../chesscom.js';
 import { db } from '../store.js';
 import { prefs, setPref } from '../prefs.js';
 import { enqueueReview, reviewProgress, isReviewed, reviewingId } from '../reviewer.js';
@@ -39,7 +41,14 @@ export async function syncGames() {
         : 'Новых законченных партий нет.',
     );
   } catch (e) {
-    const msg = e instanceof TypeError ? 'Нет связи с chess.com. Проверь интернет.' : e.message;
+    // TypeError у fetch — это и обрыв сети, и ответ chess.com без CORS (например, на неверный ник)
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    let msg = e.message;
+    if (e instanceof TypeError) {
+      msg = offline
+        ? 'Нет интернета — партии подтянутся, когда появится связь.'
+        : `chess.com не ответил на запрос по нику «${prefs.username}». Проверь ник в настройках или попробуй позже.`;
+    }
     setStatus(msg, 'error');
   } finally {
     syncing = false;
@@ -136,8 +145,15 @@ export function initGames() {
 
   byId('connect').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const name = byId('connect-name').value.trim();
+    let name;
+    try {
+      name = normalizeUsername(byId('connect-name').value);
+    } catch (err) {
+      setStatus(err.message, 'error');
+      return;
+    }
     if (!name) return;
+    byId('connect-name').value = name;
     await setPref('username', name);
     byId('set-name').value = name;
     await renderGames();

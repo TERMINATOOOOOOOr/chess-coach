@@ -4279,87 +4279,7 @@ const db = {
 
 return { db };
 })();
-const { prefs, loadPrefs, setPref } = (() => {
-// ── js/prefs.js ──
-// Настройки приложения (на устройстве).
-
-const prefs = {
-  username: '',
-  mode: 'accurate', // fast | accurate — глубина разбора партий
-  autosync: true, // проверять новые партии при запуске
-  autoreview: true, // сразу разбирать новые партии
-};
-
-async function loadPrefs() {
-  for (const k of Object.keys(prefs)) prefs[k] = await db.getSetting(k, prefs[k]);
-  return prefs;
-}
-
-async function setPref(k, v) {
-  prefs[k] = v;
-  await db.setSetting(k, v);
-}
-
-return { prefs, loadPrefs, setPref };
-})();
-const { byId, h, svgEl, bus, emit, on, toast, formatDate } = (() => {
-// ── js/ui/dom.js ──
-// Мелкие DOM-помощники и общая шина событий.
-
-const byId = (id) => document.getElementById(id);
-
-/** h('div.card', {onclick}, 'текст', child) */
-function h(tag, attrs = {}, ...children) {
-  const [name, ...classes] = tag.split('.');
-  const el = document.createElement(name || 'div');
-  if (classes.length) el.className = classes.join(' ');
-  for (const [k, v] of Object.entries(attrs || {})) {
-    if (v == null || v === false) continue;
-    if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
-    else if (k === 'class') el.className += (el.className ? ' ' : '') + v;
-    else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
-    else if (k === 'text') el.textContent = v;
-    else el.setAttribute(k, v === true ? '' : v);
-  }
-  for (const c of children.flat()) {
-    if (c == null || c === false) continue;
-    el.append(c instanceof Node ? c : document.createTextNode(String(c)));
-  }
-  return el;
-}
-
-const svgEl = (tag, attrs = {}) => {
-  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
-  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
-  return el;
-};
-
-/** Шина событий приложения: review-progress, reviewed, games-changed. */
-const bus = new EventTarget();
-const emit = (type, detail) => bus.dispatchEvent(new CustomEvent(type, { detail }));
-const on = (type, fn) => bus.addEventListener(type, (e) => fn(e.detail));
-
-let toastTimer = null;
-function toast(text, kind = '') {
-  const t = byId('toast');
-  if (!t) return;
-  t.textContent = text;
-  t.className = `toast show ${kind}`;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (t.className = 'toast'), 3800);
-}
-
-function formatDate(unixSec) {
-  if (!unixSec) return '';
-  const d = new Date(unixSec * 1000);
-  const now = new Date();
-  const sameYear = d.getFullYear() === now.getFullYear();
-  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', ...(sameYear ? {} : { year: 'numeric' }) });
-}
-
-return { byId, h, svgEl, bus, emit, on, toast, formatDate };
-})();
-const { timeClassName, formatTimeControl, monthUrls, normalizeGame, isStandard, fetchRecentGames, parseShared, findLinkedGame, gameFromPgn } = (() => {
+const { timeClassName, normalizeUsername, formatTimeControl, monthUrls, normalizeGame, isStandard, fetchRecentGames, parseShared, findLinkedGame, gameFromPgn } = (() => {
 // ── js/chesscom.js ──
 // Партии с chess.com: только законченные игры из публичных месячных архивов
 // (https://www.chess.com/news/view/published-data-api). Помощи в идущих партиях здесь нет и не будет.
@@ -4376,6 +4296,22 @@ const REASON = {
 const DRAWS = new Set(['agreed', 'repetition', 'stalemate', 'insufficient', '50move', 'timevsinsufficient']);
 
 const timeClassName = (tc) => TIME_CLASS[tc] || tc || '';
+
+const NICK_RE = /^[A-Za-z0-9_-]{3,25}$/;
+
+/**
+ * Ник из того, что ввёл человек: «magnus», «@magnus», ссылка на профиль
+ * https://www.chess.com/member/magnus (в т.ч. /ru/member/…?ref=…). Пустая строка → ''.
+ */
+function normalizeUsername(input) {
+  let s = String(input || '').trim();
+  if (!s) return '';
+  const m = /chess\.com\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?member\/([^/?#\s]+)/i.exec(s);
+  if (m) s = decodeURIComponent(m[1]);
+  s = s.replace(/^@/, '').trim();
+  if (!NICK_RE.test(s)) throw new Error('Это не похоже на ник chess.com — нужен ник, например magnus');
+  return s;
+}
 
 /** «180+2» → «3+2», «1/86400» → «1 дн./ход». */
 function formatTimeControl(tc) {
@@ -4440,8 +4376,10 @@ const isStandard = (g) => g && g.rules === 'chess' && typeof g.pgn === 'string' 
 
 async function getJson(url, fetchImpl) {
   const r = await fetchImpl(url, { headers: { Accept: 'application/json' } });
-  if (r.status === 404) return { notFound: true };
-  if (!r.ok) throw new Error(`chess.com ответил ${r.status}`);
+  // 410 chess.com отдаёт на закрытые и несуществующие аккаунты
+  if (r.status === 404 || r.status === 410) return { notFound: true };
+  if (r.status === 429) throw new Error('chess.com просит подождать: слишком много запросов. Попробуй через минуту.');
+  if (!r.ok) throw new Error(`chess.com сейчас отвечает ошибкой (${r.status}). Попробуй позже.`);
   return r.json();
 }
 
@@ -4450,7 +4388,7 @@ async function getJson(url, fetchImpl) {
  * @returns {Promise<Array>} от новых к старым
  */
 async function fetchRecentGames(username, { months = 2, limit = 30, now = new Date(), fetchImpl = fetch } = {}) {
-  const name = username.trim();
+  const name = normalizeUsername(username);
   if (!name) throw new Error('Укажи ник chess.com');
   const all = [];
   let found = false;
@@ -4526,7 +4464,97 @@ function gameFromPgn(pgn, username = '') {
   };
 }
 
-return { timeClassName, formatTimeControl, monthUrls, normalizeGame, isStandard, fetchRecentGames, parseShared, findLinkedGame, gameFromPgn };
+return { timeClassName, normalizeUsername, formatTimeControl, monthUrls, normalizeGame, isStandard, fetchRecentGames, parseShared, findLinkedGame, gameFromPgn };
+})();
+const { prefs, loadPrefs, setPref } = (() => {
+// ── js/prefs.js ──
+// Настройки приложения (на устройстве).
+
+
+const prefs = {
+  username: '',
+  mode: 'accurate', // fast | accurate — глубина разбора партий
+  autosync: true, // проверять новые партии при запуске
+  autoreview: true, // сразу разбирать новые партии
+};
+
+async function loadPrefs() {
+  for (const k of Object.keys(prefs)) prefs[k] = await db.getSetting(k, prefs[k]);
+  // раньше в поле ника могла сохраниться ссылка на профиль — превращаем её в ник
+  if (prefs.username) {
+    try {
+      const nick = normalizeUsername(prefs.username);
+      if (nick !== prefs.username) await setPref('username', nick);
+    } catch {
+      /* оставляем как есть — при синхронизации будет понятная ошибка */
+    }
+  }
+  return prefs;
+}
+
+async function setPref(k, v) {
+  prefs[k] = v;
+  await db.setSetting(k, v);
+}
+
+return { prefs, loadPrefs, setPref };
+})();
+const { byId, h, svgEl, bus, emit, on, toast, formatDate } = (() => {
+// ── js/ui/dom.js ──
+// Мелкие DOM-помощники и общая шина событий.
+
+const byId = (id) => document.getElementById(id);
+
+/** h('div.card', {onclick}, 'текст', child) */
+function h(tag, attrs = {}, ...children) {
+  const [name, ...classes] = tag.split('.');
+  const el = document.createElement(name || 'div');
+  if (classes.length) el.className = classes.join(' ');
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
+    else if (k === 'class') el.className += (el.className ? ' ' : '') + v;
+    else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+    else if (k === 'text') el.textContent = v;
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of children.flat()) {
+    if (c == null || c === false) continue;
+    el.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  }
+  return el;
+}
+
+const svgEl = (tag, attrs = {}) => {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+};
+
+/** Шина событий приложения: review-progress, reviewed, games-changed. */
+const bus = new EventTarget();
+const emit = (type, detail) => bus.dispatchEvent(new CustomEvent(type, { detail }));
+const on = (type, fn) => bus.addEventListener(type, (e) => fn(e.detail));
+
+let toastTimer = null;
+function toast(text, kind = '') {
+  const t = byId('toast');
+  if (!t) return;
+  t.textContent = text;
+  t.className = `toast show ${kind}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (t.className = 'toast'), 3800);
+}
+
+function formatDate(unixSec) {
+  if (!unixSec) return '';
+  const d = new Date(unixSec * 1000);
+  const now = new Date();
+  const sameYear = d.getFullYear() === now.getFullYear();
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', ...(sameYear ? {} : { year: 'numeric' }) });
+}
+
+return { byId, h, svgEl, bus, emit, on, toast, formatDate };
 })();
 const { REVIEW_VERSION, REVIEW_MODES, ERROR_TYPES, PHASES, gamePositions, phaseOf, errorType, analyzeGame, buildReview, winSeries, progressStats } = (() => {
 // ── js/review.js ──
@@ -5732,7 +5760,14 @@ async function syncGames() {
         : 'Новых законченных партий нет.',
     );
   } catch (e) {
-    const msg = e instanceof TypeError ? 'Нет связи с chess.com. Проверь интернет.' : e.message;
+    // TypeError у fetch — это и обрыв сети, и ответ chess.com без CORS (например, на неверный ник)
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    let msg = e.message;
+    if (e instanceof TypeError) {
+      msg = offline
+        ? 'Нет интернета — партии подтянутся, когда появится связь.'
+        : `chess.com не ответил на запрос по нику «${prefs.username}». Проверь ник в настройках или попробуй позже.`;
+    }
     setStatus(msg, 'error');
   } finally {
     syncing = false;
@@ -5829,8 +5864,15 @@ function initGames() {
 
   byId('connect').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const name = byId('connect-name').value.trim();
+    let name;
+    try {
+      name = normalizeUsername(byId('connect-name').value);
+    } catch (err) {
+      setStatus(err.message, 'error');
+      return;
+    }
     if (!name) return;
+    byId('connect-name').value = name;
     await setPref('username', name);
     byId('set-name').value = name;
     await renderGames();
@@ -6308,6 +6350,7 @@ const { APK_URL, initSettings } = (() => {
 
 
 
+
 const APK_URL = 'https://github.com/TERMINATOOOOOOOr/chess-coach/releases/latest/download/shoh.apk';
 
 function initSettings({ onUsernameChange }) {
@@ -6315,7 +6358,14 @@ function initSettings({ onUsernameChange }) {
   name.value = prefs.username;
   byId('settings-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const v = name.value.trim();
+    let v;
+    try {
+      v = normalizeUsername(name.value);
+    } catch (err) {
+      toast(err.message, 'error');
+      return;
+    }
+    name.value = v;
     if (v === prefs.username) return;
     await setPref('username', v);
     toast(v ? `Ник сохранён: ${v}` : 'Ник удалён');

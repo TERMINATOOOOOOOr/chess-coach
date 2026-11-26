@@ -15,6 +15,22 @@ const DRAWS = new Set(['agreed', 'repetition', 'stalemate', 'insufficient', '50m
 
 export const timeClassName = (tc) => TIME_CLASS[tc] || tc || '';
 
+const NICK_RE = /^[A-Za-z0-9_-]{3,25}$/;
+
+/**
+ * Ник из того, что ввёл человек: «magnus», «@magnus», ссылка на профиль
+ * https://www.chess.com/member/magnus (в т.ч. /ru/member/…?ref=…). Пустая строка → ''.
+ */
+export function normalizeUsername(input) {
+  let s = String(input || '').trim();
+  if (!s) return '';
+  const m = /chess\.com\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?member\/([^/?#\s]+)/i.exec(s);
+  if (m) s = decodeURIComponent(m[1]);
+  s = s.replace(/^@/, '').trim();
+  if (!NICK_RE.test(s)) throw new Error('Это не похоже на ник chess.com — нужен ник, например magnus');
+  return s;
+}
+
 /** «180+2» → «3+2», «1/86400» → «1 дн./ход». */
 export function formatTimeControl(tc) {
   if (!tc) return '';
@@ -78,8 +94,10 @@ export const isStandard = (g) => g && g.rules === 'chess' && typeof g.pgn === 's
 
 async function getJson(url, fetchImpl) {
   const r = await fetchImpl(url, { headers: { Accept: 'application/json' } });
-  if (r.status === 404) return { notFound: true };
-  if (!r.ok) throw new Error(`chess.com ответил ${r.status}`);
+  // 410 chess.com отдаёт на закрытые и несуществующие аккаунты
+  if (r.status === 404 || r.status === 410) return { notFound: true };
+  if (r.status === 429) throw new Error('chess.com просит подождать: слишком много запросов. Попробуй через минуту.');
+  if (!r.ok) throw new Error(`chess.com сейчас отвечает ошибкой (${r.status}). Попробуй позже.`);
   return r.json();
 }
 
@@ -88,7 +106,7 @@ async function getJson(url, fetchImpl) {
  * @returns {Promise<Array>} от новых к старым
  */
 export async function fetchRecentGames(username, { months = 2, limit = 30, now = new Date(), fetchImpl = fetch } = {}) {
-  const name = username.trim();
+  const name = normalizeUsername(username);
   if (!name) throw new Error('Укажи ник chess.com');
   const all = [];
   let found = false;

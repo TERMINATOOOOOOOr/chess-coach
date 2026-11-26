@@ -243,12 +243,15 @@ async def run_phone_app(browser, url, check):
     await page.screenshot(path=str(SHOTS / 'phone-connect.png'))
 
     # 1. ник → партии подтянулись, шахматы-960 отфильтрованы
-    await page.fill('#connect-name', 'TestPlayer')
+    # вставляют ссылку на профиль вместо ника — так и было на настоящем телефоне
+    await page.fill('#connect-name', 'https://www.chess.com/member/TestPlayer')
     await page.click('#connect button[type=submit]')
     await page.wait_for_selector('.gcard', timeout=15000)
     await page.wait_for_timeout(300)
     ids = await page.eval_on_selector_all('.gcard', 'els => els.map(e => e.dataset.id)')
     check(ids == ['cc-live-100000002', 'cc-live-100000001', 'cc-daily-200000004'], f'партии с chess.com: {ids}')
+    who = await page.text_content('#games-user')
+    check(who == 'chess.com · TestPlayer', f'ссылка на профиль превратилась в ник: {who}')
     await page.screenshot(path=str(SHOTS / 'phone-games.png'))
 
     # 2. открыть партию → разбор доходит до конца

@@ -1,5 +1,6 @@
 // Экран «Настройки».
 import { prefs, setPref } from '../prefs.js';
+import { normalizeUsername } from '../chesscom.js';
 import { db } from '../store.js';
 import { byId, toast } from './dom.js';
 
@@ -10,7 +11,14 @@ export function initSettings({ onUsernameChange }) {
   name.value = prefs.username;
   byId('settings-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const v = name.value.trim();
+    let v;
+    try {
+      v = normalizeUsername(name.value);
+    } catch (err) {
+      toast(err.message, 'error');
+      return;
+    }
+    name.value = v;
     if (v === prefs.username) return;
     await setPref('username', v);
     toast(v ? `Ник сохранён: ${v}` : 'Ник удалён');
