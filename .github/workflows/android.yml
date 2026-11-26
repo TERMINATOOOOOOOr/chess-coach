@@ -3,6 +3,11 @@ name: APK для Android
 on:
   push:
     branches: [main]
+    # правки тестов и документации не выпускают новый APK
+    paths-ignore:
+      - 'tests/**'
+      - '**.md'
+      - 'dist/**'
   workflow_dispatch:
 
 permissions:

@@ -337,10 +337,13 @@ def main():
     sys.stdout.reconfigure(encoding='utf-8')
     ap = argparse.ArgumentParser()
     ap.add_argument('--file', help='открыть файл по file:// вместо сервера')
+    ap.add_argument('--url', help='проверить уже опубликованный сайт (например, GitHub Pages)')
     args = ap.parse_args()
     SHOTS.mkdir(parents=True, exist_ok=True)
     check = Check()
-    if args.file:
+    if args.url:
+        asyncio.run(run(args.url, check))
+    elif args.file:
         asyncio.run(run((ROOT / args.file).resolve().as_uri(), check))
     else:
         with server() as url:
