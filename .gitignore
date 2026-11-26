@@ -1,0 +1,10 @@
+# служебное окружение
+.claude/
+.mcp.json
+CLAUDE.md
+.playwright-mcp/
+
+# артефакты тестов
+tests/screens/
+__pycache__/
+node_modules/

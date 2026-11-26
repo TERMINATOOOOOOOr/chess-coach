@@ -1,0 +1,10 @@
+{
+  "name": "shoh-chess-coach",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "e2e": "python tests/e2e.py",
+    "build": "python tools/bundle.py"
+  }
+}
