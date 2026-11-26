@@ -517,7 +517,7 @@ input[type="text"]:focus, textarea:focus { border-color: var(--amber); box-shado
 .moment i { font-style: normal; display: inline-grid; place-items: center; min-width: 20px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--c); color: #141414; font-size: 11px; font-weight: 800; }
 .moment small { color: var(--muted); font-weight: 500; }
 .moment.theirs { opacity: .75; }
-.review-moves { max-height: 300px; }
+.review-moves { max-height: 300px; position: relative; }
 .review-moves .mv { cursor: pointer; }
 .review-moves .mv:hover { background: rgba(255,255,255,.05); }
 
@@ -6254,7 +6254,13 @@ function renderPosition() {
   // подсветка хода в списке
   for (const el of document.querySelectorAll('#review-moves .mv')) el.classList.toggle('last', +el.dataset.i === i - 1);
   const cur = document.querySelector(`#review-moves .mv[data-i="${i - 1}"]`);
-  if (cur) cur.scrollIntoView({ block: 'nearest' });
+  // прокручиваем только сам список ходов: scrollIntoView двигал бы всю страницу вниз к списку
+  if (cur) {
+    const list = byId('review-moves'); // position: relative — offsetTop считается от начала списка
+    const top = cur.offsetTop;
+    if (top < list.scrollTop) list.scrollTop = top;
+    else if (top + cur.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = top + cur.offsetHeight - list.clientHeight;
+  }
   drawGraphCursor();
 }
 

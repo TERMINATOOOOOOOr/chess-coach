@@ -489,7 +489,7 @@ input[type="text"]:focus, textarea:focus { border-color: var(--amber); box-shado
 .moment i { font-style: normal; display: inline-grid; place-items: center; min-width: 20px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--c); color: #141414; font-size: 11px; font-weight: 800; }
 .moment small { color: var(--muted); font-weight: 500; }
 .moment.theirs { opacity: .75; }
-.review-moves { max-height: 300px; }
+.review-moves { max-height: 300px; position: relative; }
 .review-moves .mv { cursor: pointer; }
 .review-moves .mv:hover { background: rgba(255,255,255,.05); }
 

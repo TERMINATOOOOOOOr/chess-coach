@@ -94,7 +94,13 @@ function renderPosition() {
   // подсветка хода в списке
   for (const el of document.querySelectorAll('#review-moves .mv')) el.classList.toggle('last', +el.dataset.i === i - 1);
   const cur = document.querySelector(`#review-moves .mv[data-i="${i - 1}"]`);
-  if (cur) cur.scrollIntoView({ block: 'nearest' });
+  // прокручиваем только сам список ходов: scrollIntoView двигал бы всю страницу вниз к списку
+  if (cur) {
+    const list = byId('review-moves'); // position: relative — offsetTop считается от начала списка
+    const top = cur.offsetTop;
+    if (top < list.scrollTop) list.scrollTop = top;
+    else if (top + cur.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = top + cur.offsetHeight - list.clientHeight;
+  }
   drawGraphCursor();
 }
 
